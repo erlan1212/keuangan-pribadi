@@ -1,19 +1,15 @@
 // ============================================================
-// Service Worker — Keuangan Pribadi
-// File: sw.js
-// Cache shell statis agar app bisa dibuka offline,
-// data tetap diambil dari Google Sheets saat online.
+// Service Worker — Keuangan Pribadi v3
 // ============================================================
 
-const CACHE_NAME = 'keuangan-v1';
+const CACHE_NAME = 'keuangan-v3';  // naikkan versi → cache lama otomatis dihapus
 const SHELL_FILES = [
-  './',
   './index.html',
   './manifest.json',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
 ];
 
-// ── Install: cache shell ─────────────────────────────────────
+// ── Install ──────────────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -22,27 +18,28 @@ self.addEventListener('install', event => {
   );
 });
 
-// ── Activate: hapus cache lama ───────────────────────────────
+// ── Activate: hapus semua cache versi lama ───────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
-// ── Fetch: cache-first untuk shell, network-first untuk API ──
+// ── Fetch ────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
-  // Selalu ke network untuk request ke Apps Script (API) — jangan di-cache
-  if (url.includes('script.google.com')) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
+  // Jangan intercept JSONP/script tag ke Apps Script — biarkan browser handle
+  if (url.includes('script.google.com')) return;
 
-  // Cache-first untuk file statis
+  // Jangan intercept request non-GET
+  if (event.request.method !== 'GET') return;
+
+  // Cache-first untuk file statis shell
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
+    caches.match(event.request)
+      .then(cached => cached || fetch(event.request))
   );
 });

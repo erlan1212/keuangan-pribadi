@@ -1347,10 +1347,16 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
-<!-- Service Worker registration -->
+<!-- Service Worker: unregister versi lama, lalu register versi baru -->
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Unregister semua SW lama dulu, baru register yang baru
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    const unregAll = regs.map(r => r.unregister());
+    Promise.all(unregAll).then(() => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  });
 }
 </script>
 
