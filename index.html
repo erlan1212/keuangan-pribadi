@@ -786,19 +786,23 @@ function showLoading(show) {
 }
 
 // ── API calls ────────────────────────────────────────────────
+// Semua request pakai GET agar tidak kena CORS/redirect issue
+// yang terjadi pada cross-origin POST ke Google Apps Script.
 async function apiGet(params) {
   const url = new URL(API_URL);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), { redirect: 'follow' });
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 async function apiPost(body) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    body: JSON.stringify(body),
-    redirect: 'follow',
-  });
+  // Kirim sebagai GET dengan data di-encode ke query param
+  const url = new URL(API_URL);
+  url.searchParams.set('action', body.action);
+  if (body.data) url.searchParams.set('data', encodeURIComponent(JSON.stringify(body.data)));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 

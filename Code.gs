@@ -13,13 +13,18 @@ const SHEET_PENGELUARAN = 'Pengeluaran';
 const HEADERS = ['Tanggal', 'Kategori', 'Nominal', 'Catatan'];
 
 // ─── ENTRY POINT HTTP ────────────────────────────────────────
+// Semua request (baca & tulis) pakai doGet agar tidak kena
+// batasan CORS/redirect pada cross-origin POST dari browser.
 
 function doGet(e) {
   const action = e.parameter.action || '';
   try {
     let result;
-    if (action === 'getAll')       result = getAllData();
-    else if (action === 'getSummary') result = getSummary(e.parameter.startDate, e.parameter.endDate);
+    if      (action === 'getAll')          result = getAllData();
+    else if (action === 'getSummary')      result = getSummary(e.parameter.startDate, e.parameter.endDate);
+    else if (action === 'addTransaction')  result = addTransaction(JSON.parse(decodeURIComponent(e.parameter.data)));
+    else if (action === 'editTransaction') result = editTransaction(JSON.parse(decodeURIComponent(e.parameter.data)));
+    else if (action === 'deleteTransaction') result = deleteTransaction(JSON.parse(decodeURIComponent(e.parameter.data)));
     else result = { error: 'Action tidak dikenal' };
     return jsonResponse(result);
   } catch (err) {
@@ -27,6 +32,7 @@ function doGet(e) {
   }
 }
 
+// doPost tetap ada sebagai fallback, tidak dihapus
 function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents);
@@ -200,7 +206,9 @@ function validateTransaction(data) {
 }
 
 function jsonResponse(data) {
-  return ContentService
+  // Tambah CORS header agar browser tidak blokir response
+  const output = ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+  return output;
 }

@@ -35,13 +35,9 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = event.request.url;
 
-  // Selalu ke network untuk request ke Apps Script (API)
+  // Selalu ke network untuk request ke Apps Script (API) — jangan di-cache
   if (url.includes('script.google.com')) {
-    event.respondWith(fetch(event.request).catch(() =>
-      new Response(JSON.stringify({ error: 'Tidak ada koneksi internet.' }), {
-        headers: { 'Content-Type': 'application/json' },
-      })
-    ));
+    event.respondWith(fetch(event.request));
     return;
   }
 
