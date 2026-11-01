@@ -16,19 +16,26 @@ const HEADERS = ['Tanggal', 'Kategori', 'Nominal', 'Catatan'];
 // Semua request (baca & tulis) pakai doGet agar tidak kena
 // batasan CORS/redirect pada cross-origin POST dari browser.
 
+// Handle preflight CORS request dari browser
+function doOptions(e) {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
 function doGet(e) {
-  const action = e.parameter.action || '';
+  const action   = e.parameter.action   || '';
+  const callback = e.parameter.callback || '';   // untuk JSONP
   try {
     let result;
-    if      (action === 'getAll')          result = getAllData();
-    else if (action === 'getSummary')      result = getSummary(e.parameter.startDate, e.parameter.endDate);
-    else if (action === 'addTransaction')  result = addTransaction(JSON.parse(decodeURIComponent(e.parameter.data)));
-    else if (action === 'editTransaction') result = editTransaction(JSON.parse(decodeURIComponent(e.parameter.data)));
+    if      (action === 'getAll')            result = getAllData();
+    else if (action === 'getSummary')        result = getSummary(e.parameter.startDate, e.parameter.endDate);
+    else if (action === 'addTransaction')    result = addTransaction(JSON.parse(decodeURIComponent(e.parameter.data)));
+    else if (action === 'editTransaction')   result = editTransaction(JSON.parse(decodeURIComponent(e.parameter.data)));
     else if (action === 'deleteTransaction') result = deleteTransaction(JSON.parse(decodeURIComponent(e.parameter.data)));
     else result = { error: 'Action tidak dikenal' };
-    return jsonResponse(result);
+    return jsonpResponse(result, callback);
   } catch (err) {
-    return jsonResponse({ error: err.message });
+    return jsonpResponse({ error: err.message }, callback);
   }
 }
 
@@ -205,10 +212,16 @@ function validateTransaction(data) {
     throw new Error('Jenis transaksi tidak valid.');
 }
 
-function jsonResponse(data) {
-  // Tambah CORS header agar browser tidak blokir response
-  const output = ContentService
-    .createTextOutput(JSON.stringify(data))
+function jsonpResponse(data, callback) {
+  const json = JSON.stringify(data);
+  // Kalau ada callback (JSONP dari browser), bungkus: callback({...})
+  // Kalau tidak ada (test langsung di browser), kembalikan JSON biasa
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + '(' + json + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService
+    .createTextOutput(json)
     .setMimeType(ContentService.MimeType.JSON);
-  return output;
 }

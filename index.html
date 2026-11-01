@@ -786,25 +786,53 @@ function showLoading(show) {
   $('loadingOverlay').classList.toggle('hidden', !show);
 }
 
-// ── API calls ────────────────────────────────────────────────
-// Semua request pakai GET agar tidak kena CORS/redirect issue
-// yang terjadi pada cross-origin POST ke Google Apps Script.
+// ── API calls via JSONP ──────────────────────────────────────
+// Apps Script tidak bisa set header CORS custom, sehingga fetch()
+// diblokir browser. Solusi: JSONP — inject <script> tag ke DOM,
+// Apps Script membalas dengan callback(data), tidak kena CORS.
+let _jsonpCounter = 0;
+
+function jsonpCall(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '__jsonp_cb_' + (++_jsonpCounter);
+    const timeout = setTimeout(() => {
+      delete window[cbName];
+      script.remove();
+      reject(new Error('Request timeout. Pastikan Apps Script sudah di-deploy ulang (New version).'));
+    }, 15000);
+
+    window[cbName] = (data) => {
+      clearTimeout(timeout);
+      delete window[cbName];
+      script.remove();
+      resolve(data);
+    };
+
+    const url = new URL(API_URL);
+    url.searchParams.set('callback', cbName);
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+    });
+
+    const script = document.createElement('script');
+    script.src = url.toString();
+    script.onerror = () => {
+      clearTimeout(timeout);
+      delete window[cbName];
+      reject(new Error('Gagal terhubung ke Apps Script. Cek URL di bagian atas index.html.'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
 async function apiGet(params) {
-  const url = new URL(API_URL);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return jsonpCall(params);
 }
 
 async function apiPost(body) {
-  // Kirim sebagai GET dengan data di-encode ke query param
-  const url = new URL(API_URL);
-  url.searchParams.set('action', body.action);
-  if (body.data) url.searchParams.set('data', encodeURIComponent(JSON.stringify(body.data)));
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  const params = { action: body.action };
+  if (body.data) params.data = encodeURIComponent(JSON.stringify(body.data));
+  return jsonpCall(params);
 }
 
 // ── Date filter helpers ──────────────────────────────────────
